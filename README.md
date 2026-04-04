@@ -17,4 +17,4 @@ The MEKF estimate follows pretty closely to the true value, but not exactly. I p
 
 Plans moving forward:
 
-I plan to add a detumbling mode next, which then moves into the pointing mode. After that, I would like to add a momentum desaturation mode since the reaction wheels eventually reach saturation.
+I plan to add a detumbling mode next, which then moves into the pointing mode. After that, I would like to refine the momentum desaturation since it's somewhat basic currently.
