@@ -7,9 +7,17 @@ from tqdm import tqdm
 # GNC Earth-Pointing project
 
 # Initial Variables and Constants
+rng = np.random.default_rng()
+
 quatin = np.sqrt(2)/2 * np.array([1, 0, 0, 1])
-quat0 = quatin/np.linalg.norm(quatin)
-w0 = np.array([13.53*np.pi/180, 13.53*np.pi/180, 13.053*np.pi/180])
+#quat0 = quatin/np.linalg.norm(quatin)
+q0rand = rng.normal(0, 1, 4)
+quat0 = q0rand / np.linalg.norm(q0rand)
+#w0 = np.array([13.53*np.pi/180, 13.53*np.pi/180, 13.053*np.pi/180])
+wmag0 = rng.uniform(7, 15) * np.pi/180
+wdir = rng.normal(0, 1, 3)
+wdir /= np.linalg.norm(wdir)
+w0 = wmag0 * wdir
 hrw0 = np.array([0, 0, 0])
 J = np.array([[0.035, -0.001, 0.0004], [-0.001, 0.035, -0.0008], [0.0004, -0.0008, 0.006]])
 Jinv = np.linalg.inv(J)
@@ -19,7 +27,6 @@ sqrt = np.sqrt
 kep0 = np.array([15.49442598, 0.0007785, 51.6334*pi/180, 312.1983*pi/180, 38.3265*pi/180, 321.8276*pi/180, .00016677])
 ain = ((3.986e5)/((kep0[0]*2*pi/24/60/60)**2))**(1/3)
 T = 2*pi*sqrt((ain**3)/(3.986e5))
-rng = np.random.default_rng()
 
 # initial state
 s0 = np.concatenate([quat0.reshape(-1, 1), w0.reshape(-1, 1), hrw0.reshape(-1, 1)])
@@ -401,7 +408,7 @@ def DetumDynamics(t, sflat, J, kep0):
     BB = (quat2dcm(quatcur) @ BN).reshape(3,1)
 
     # B-dot control law
-    k = 1e-4
+    k = 5e-4
     b = BB / np.linalg.norm(BB)
     m = k/ (np.linalg.norm(BB)) * (np.cross(wcur, b, axis=0))
 
@@ -419,7 +426,7 @@ def DetumDynamics(t, sflat, J, kep0):
 
 def DetDone(t, sflat, J, kep0):
     wcur = sflat[4:7]
-    wthresh = 0.5 * pi/180
+    wthresh = 1 * pi/180
     return np.linalg.norm(wcur) - wthresh
 
 # Detumbling Mode
@@ -479,22 +486,14 @@ wdet = solDet.y[4:7, :]
 wmag = np.linalg.norm(wdet, axis=0)
 
 plt.figure()
-plt.subplot(2, 1, 1)
 plt.plot(solDet.t, wdet[0, :], 'r', label='wx')
 plt.plot(solDet.t, wdet[1, :], 'g', label='wy')
 plt.plot(solDet.t, wdet[2, :], 'b', label='wz')
-plt.axhline(y=0.5*pi/180, color='k', linestyle='--', label='Threshold (0.5 deg/s)')
-plt.axhline(y=-0.5*pi/180, color='k', linestyle='--')
+plt.axhline(y=1*pi/180, color='k', linestyle='--', label='Threshold (1 deg/s)')
+plt.axhline(y=-1*pi/180, color='k', linestyle='--')
 plt.ylabel("Angular Velocity (rad/s)")
 plt.legend()
 plt.title("Detumbling Phase")
-
-plt.subplot(2, 1, 2)
-plt.plot(solDet.t, wmag, 'k', label='|ω|')
-plt.axhline(y=0.5*pi/180, color='r', linestyle='--', label='Threshold')
-plt.xlabel("Time (seconds)")
-plt.ylabel("|ω| (rad/s)")
-plt.legend()
 plt.show(block=False)
 
 
@@ -537,8 +536,8 @@ beta = 0.01 * (pi/180) * (1/3600)
 betatrue = np.array([beta, beta, beta]).reshape(-1,1)
 beta_est_prior = np.zeros((3, 1))
 
-Q_state = (((6/3600)*(np.pi/180))**2)*np.eye(3)
-bias_cov = (1e-2)**2 * np.eye(3)
+Q_state = (((3)*(np.pi/180))**2)*np.eye(3)
+bias_cov = (1e-4)**2 * np.eye(3)
 P_prior = np.block([
     [Q_state, np.zeros((3, 3))],
     [np.zeros((3, 3)), bias_cov]])
