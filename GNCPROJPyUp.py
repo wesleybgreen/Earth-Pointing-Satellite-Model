@@ -383,62 +383,14 @@ def magfield(t, rvec):
     B = (1/rmag**5) * (3 * np.dot(mhat.T, rvec)*rvec - rmag**2 * mhat)
     return B.reshape(3,1)
 
-s0flat = s0.flatten()
-
-sol = solve_ivp(
-    fun = dynamics, 
-    t_span = tspan, 
-    y0 = s0flat, 
-    t_eval=teval, 
-    args=(J, kep0),
-    method='RK45'
-)
-
-quats = sol.y[0:4, :]
-omegas = sol.y[4:7, :]
-h_wheels = sol.y[7:10, :]
-
-quat_err_hist = []
-w_err_hist = []
-
-for i in range(len(sol.t)):
-    r, v = orbitprop(sol.t[i], kep0)
-    q_e, w_e, RBL = errorfunc(sol.t[i], r, v, quats[:, i], omegas[:, i], kep0)
-    quat_err_hist.append(q_e)
-    w_err_hist.append(w_e)
-
-quat_err_hist = np.array(quat_err_hist).squeeze()
-w_err_hist = np.array(w_err_hist).squeeze()
-
-
-time = sol.t
-
-plt.figure()
-plt.subplot(3, 1, 1)
-plt.plot(time, quat_err_hist)
-plt.xlabel("Time (seconds)")
-plt.ylabel("Quaternion Error")
-
-plt.subplot(3, 1, 2)
-plt.plot(time, w_err_hist)
-plt.xlabel("Time (seconds)")
-plt.ylabel("Angular Velocity Error")
-
-plt.subplot(3, 1, 3)
-plt.plot(time, h_wheels.T)
-plt.xlabel("Time (seconds)")
-plt.ylabel("Wheel Angular Momentum")
-
-plt.show(block=False)
-plt.pause(0.1)
-
-
 # Set up MEKF
+s0flat = s0.flatten()
+time = teval
 
 # Initialize variables
 
 tauctrl = np.array([0, 0 , 0])
-xtrue = np.zeros((len(sol.t), 10))
+xtrue = np.zeros((len(teval), 10))
 xtrue[0, :] = s0flat
 
 quatetrueplt = []
@@ -446,8 +398,8 @@ wetrueplt = []
 currentstateplt = s0flat
 
 # Initial Error
-r0, v0 = orbitprop(sol.t[0], kep0)
-q_err0, w_err0, RBL0 = errorfunc(sol.t[0], r0, v0, quat0.reshape(-1,1), w0.reshape(-1,1), kep0)
+r0, v0 = orbitprop(teval[0], kep0)
+q_err0, w_err0, RBL0 = errorfunc(teval[0], r0, v0, quat0.reshape(-1,1), w0.reshape(-1,1), kep0)
 quatetrueplt = [q_err0.flatten()]
 wetrueplt = [w_err0.flatten()]
 hrwtrueplt = [hrw0.flatten()]
@@ -460,7 +412,8 @@ yplt = []
 
 # Gyro Bias
 rng = np.random.default_rng()
-sigv = 0.001
+sigv = 0.2 * (pi/180) / sqrt(3600)
+# sigv = 0.001
 sigu = 1e-6
 
 etav = rng.normal(0, sigv)
@@ -483,19 +436,19 @@ Q = np.block([
     [np.zeros((3, 3)), ((sigu)**2)*np.eye(3)]
 ])
 
-P = np.zeros((6, 6, len(sol.t)))
+P = np.zeros((6, 6, len(teval)))
 P[:, :, 0] = P_prior
 betahist = []
 
-xhat = np.zeros((len(sol.t), 7))
+xhat = np.zeros((len(teval), 7))
 q0noisy = quat0.reshape(-1, 1) + 0.0001 * np.random.randn(4, 1)
 q0noisy = q0noisy/np.linalg.norm(q0noisy)
 
 xhat[0, :] = np.concatenate([q0noisy, beta_est_prior]).flatten()
 
-for j in tqdm(range(1, len(sol.t)), desc="Simulating"):
-    truespan = [sol.t[j-1], sol.t[j]]
-    dt = sol.t[j] - sol.t[j-1]
+for j in tqdm(range(1, len(teval)), desc="Simulating"):
+    truespan = [teval[j-1], teval[j]]
+    dt = teval[j] - teval[j-1]
 
     Q_discrete = np.block([
     [(sigv**2) * dt * np.eye(3), np.zeros((3, 3))],
@@ -506,7 +459,7 @@ for j in tqdm(range(1, len(sol.t)), desc="Simulating"):
         fun = KFdynamics,
         t_span = truespan,
         y0 = xtrue[j-1, :],
-        t_eval = [sol.t[j]],
+        t_eval = [teval[j]],
         args = (J, kep0, tauctrl),
         method = "RK45"
     )
@@ -518,10 +471,10 @@ for j in tqdm(range(1, len(sol.t)), desc="Simulating"):
     hrwcur = xtrue[j, 7:10].reshape(-1,1)
 
     # Current orbit pos and vel
-    rvec, vvec = orbitprop(sol.t[j], kep0)
+    rvec, vvec = orbitprop(teval[j], kep0)
 
     # Calculate frame change and error values
-    quatetrue, wetrue, RBL = errorfunc(sol.t[j], rvec, vvec, quatcur, wcur, kep0)
+    quatetrue, wetrue, RBL = errorfunc(teval[j], rvec, vvec, quatcur, wcur, kep0)
     quatetrueplt.append(quatetrue.flatten())
     wetrueplt.append(wetrue.flatten())
     hrwtrueplt.append(hrwcur.flatten())
@@ -574,7 +527,7 @@ for j in tqdm(range(1, len(sol.t)), desc="Simulating"):
     #Rlist.append(Rstar)
 
     # Sun Sensor
-    sN = ssvec(sol.t[j]) # Sun pos unit vec
+    sN = ssvec(teval[j]) # Sun pos unit vec
     Aqpred = quat2dcm(qpred).reshape(3,3)
     Aqtrue = quat2dcm(quatcur).reshape(3,3)
     sBest = (Aqpred @ sN).reshape(3,1) # Sun pos body vector
@@ -680,7 +633,7 @@ for j in tqdm(range(1, len(sol.t)), desc="Simulating"):
 
     # Magnetometer
 
-    BECI = magfield(sol.t[j], rvec).reshape(3,1)
+    BECI = magfield(teval[j], rvec).reshape(3,1)
     BN = (BECI/np.linalg.norm(BECI)).reshape(3,1)
     BBtrue = (Aqtrue @ BN).reshape(3,1)
     mfnoise = 1.5 * pi/180
@@ -741,7 +694,7 @@ for j in tqdm(range(1, len(sol.t)), desc="Simulating"):
     # Control Law
 
     westup = wmeas - betaup
-    quateKF, weKF, RBLKF = errorfunc(sol.t[j], rvec, vvec, qup, westup, kep0)
+    quateKF, weKF, RBLKF = errorfunc(teval[j], rvec, vvec, qup, westup, kep0)
     if quateKF[0] < 0:
         quateKF = -quateKF
 
