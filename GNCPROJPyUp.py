@@ -675,7 +675,7 @@ for j in tqdm(range(1, len(teval)), desc="Simulating"):
         else:
             illum = 1
     
-    if np.dot(n1s.T, sBtrue) < 0:
+    if np.dot(n1s.T, sBtrue) < 0 or illum == 0:
         Iss1m = 0
     else:
         ssnoise = rng.normal(0, 0.67*pi/180)
@@ -688,7 +688,7 @@ for j in tqdm(range(1, len(teval)), desc="Simulating"):
         Hlist.append(Hss1)
         Rlist.append(Rss1)
     
-    if np.dot(n2s.T, sBtrue) < 0:
+    if np.dot(n2s.T, sBtrue) < 0 or illum == 0:
         Iss2m = 0
     else:
         ssnoise = rng.normal(0, 0.67*pi/180)
@@ -701,7 +701,7 @@ for j in tqdm(range(1, len(teval)), desc="Simulating"):
         Hlist.append(Hss2)
         Rlist.append(Rss2)
 
-    if np.dot(n3s.T, sBtrue) < 0:
+    if np.dot(n3s.T, sBtrue) < 0 or illum == 0:
         Iss3m = 0
     else:
         ssnoise = rng.normal(0, 0.67*pi/180)
@@ -714,7 +714,7 @@ for j in tqdm(range(1, len(teval)), desc="Simulating"):
         Hlist.append(Hss3)
         Rlist.append(Rss3)
 
-    if np.dot(n4s.T, sBtrue) < 0:
+    if np.dot(n4s.T, sBtrue) < 0 or illum == 0:
         Iss4m = 0
     else:
         ssnoise = rng.normal(0, 0.67*pi/180)
@@ -727,7 +727,7 @@ for j in tqdm(range(1, len(teval)), desc="Simulating"):
         Hlist.append(Hss4)
         Rlist.append(Rss4)
 
-    if np.dot(n5s.T, sBtrue) < 0:
+    if np.dot(n5s.T, sBtrue) < 0 or illum == 0:
         Iss5m = 0
     else:
         ssnoise = rng.normal(0, 0.67*pi/180)
@@ -740,7 +740,7 @@ for j in tqdm(range(1, len(teval)), desc="Simulating"):
         Hlist.append(Hss5)
         Rlist.append(Rss5)
 
-    if np.dot(n6s.T, sBtrue) < 0:
+    if np.dot(n6s.T, sBtrue) < 0 or illum == 0:
         Iss6m = 0
     else:
         ssnoise = rng.normal(0, 0.67*pi/180)
