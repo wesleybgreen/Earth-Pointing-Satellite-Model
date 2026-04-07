@@ -429,6 +429,14 @@ def DetDone(t, sflat, J, kep0):
     wthresh = 1 * pi/180
     return np.linalg.norm(wcur) - wthresh
 
+def rk4_step(f, t, y, dt, *args):
+    k1 = f(t,           y,                       *args)
+    k2 = f(t + dt/2.0,  y + (dt/2.0) * k1,       *args)
+    k3 = f(t + dt/2.0,  y + (dt/2.0) * k2,       *args)
+    k4 = f(t + dt,      y + dt * k3,             *args)
+    
+    return y + (dt / 6.0) * (k1 + 2*k2 + 2*k3 + k4)
+
 # Detumbling Mode
 
 DetDone.terminal = True
@@ -537,7 +545,7 @@ betatrue = np.array([beta, beta, beta]).reshape(-1,1)
 beta_est_prior = np.zeros((3, 1))
 
 Q_state = (((3)*(np.pi/180))**2)*np.eye(3)
-bias_cov = (1e-4)**2 * np.eye(3)
+bias_cov = (5e-4)**2 * np.eye(3)
 P_prior = np.block([
     [Q_state, np.zeros((3, 3))],
     [np.zeros((3, 3)), bias_cov]])
@@ -569,16 +577,16 @@ for j in tqdm(range(1, len(teval)), desc="Simulating"):
     [np.zeros((3, 3)), (sigu**2) * dt * np.eye(3)]
     ])
     
-    soltrue = solve_ivp(
-        fun = KFdynamics,
-        t_span = truespan,
-        y0 = xtrue[j-1, :],
-        t_eval = [teval[j]],
-        args = (J, kep0, tauctrl),
-        method = "RK45"
-    )
+    #soltrue = solve_ivp(
+        #fun = KFdynamics,
+        #t_span = truespan,
+        #y0 = xtrue[j-1, :],
+        #t_eval = [teval[j]],
+        #args = (J, kep0, tauctrl),
+        #method = "RK45"
+    #)
 
-    xtrue[j, :] = soltrue.y[:, -1]
+    xtrue[j, :] = rk4_step(KFdynamics, teval[j-1], xtrue[j-1, :], dt, J, kep0, tauctrl)
     quatnew = xtrue[j, 0:4].reshape(-1,1)
     quatcur = quatnew/np.linalg.norm(quatnew)
     wcur = xtrue[j, 4:7].reshape(-1,1)
