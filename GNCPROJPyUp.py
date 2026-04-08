@@ -3,6 +3,8 @@ import scipy.linalg
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import ppigrf
+from datetime import datetime, timedelta
 
 # GNC Earth-Pointing project
 
@@ -390,6 +392,38 @@ def magfield(t, rvec):
     rmag = np.linalg.norm(rvec)
     B = (1/rmag**5) * (3 * np.dot(mhat.T, rvec)*rvec - rmag**2 * mhat)
     return B.reshape(3,1)
+
+#def magfield(t, rvec):
+    epoch = datetime(2026, 1, 1)  # Using current year for accuracy
+    date = epoch + timedelta(seconds=t)
+
+    we = 0.000072921158553
+    gst = we*t
+    RECI2ECEF = np.array([[np.cos(gst), np.sin(gst), 0], [-np.sin(gst), np.cos(gst), 0], [0, 0, 1]])
+    rECEF = RECI2ECEF @ rvec.reshape(-1,1)
+
+    rmag = np.linalg.norm(rECEF)
+    latrad = np.arcsin(rECEF[2].item()/rmag)
+    lat = np.rad2deg(latrad)
+    lonrad = np.arctan2(rECEF[1].item(), rECEF[0].item())
+    lon = np.rad2deg(lonrad)
+    alt = rmag - 6371
+
+    Be, Bn, Bu = ppigrf.igrf(lon, lat, alt, date)
+    Bneu = 1e-9 * np.array([Bn, Be, Bu]).reshape(3,1)
+
+    clat, slat = np.cos(latrad), np.sin(latrad)
+    clon, slon = np.cos(lonrad), np.sin(lonrad)
+    
+    RNEU2ECEF = np.array([
+        [-slat*clon, -slon, clat*clon],
+        [-slat*slon,  clon, clat*slon],
+        [ clat,       0,    slat     ]
+    ])
+    BECEF = RNEU2ECEF @ Bneu.reshape(3,1)
+    BECI = RECI2ECEF.T @ BECEF.reshape(3,1)
+
+    return BECI.reshape(3,1)
 
 def DetumDynamics(t, sflat, J, kep0):
     s = sflat.reshape(-1,1)
